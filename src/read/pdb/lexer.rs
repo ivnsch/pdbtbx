@@ -161,6 +161,7 @@ fn lex_atom(
             segment_id,
             element,
             charge,
+            autodock_type,
         ),
         basic_errors,
     ) = lex_atom_basics(linenumber, line);
@@ -184,6 +185,7 @@ fn lex_atom(
             segment_id,
             element,
             charge,
+            autodock_type,
         ),
         errors,
     ))
@@ -220,39 +222,8 @@ fn lex_anisou(linenumber: usize, line: &str) -> (LexItem, Vec<PDBError>) {
         ],
     ];
 
-    let (
-        (
-            serial_number,
-            atom_name,
-            alternate_location,
-            residue_name,
-            chain_id,
-            residue_serial_number,
-            insertion,
-            segment_id,
-            element,
-            charge,
-        ),
-        basic_errors,
-    ) = lex_atom_basics(linenumber, line);
-    errors.extend(basic_errors);
-
-    (
-        LexItem::Anisou(
-            serial_number,
-            atom_name,
-            alternate_location,
-            residue_name,
-            chain_id,
-            residue_serial_number,
-            insertion,
-            factors,
-            segment_id,
-            element,
-            charge,
-        ),
-        errors,
-    )
+    // not used for pdbqt
+    todo!()
 }
 
 /// Lex the basic structure of the ATOM/HETATM/ANISOU Records, to minimise code duplication
@@ -271,11 +242,12 @@ fn lex_atom_basics(
         Option<String>,
         String,
         String,
-        isize,
+        f32,
+        String,
     ),
     Vec<PDBError>,
 ) {
-    let mut errors = Vec::new();
+    let mut errors: Vec<PDBError> = Vec::new();
     let chars: Vec<char> = line.chars().collect();
 
     let serial_number = parse(linenumber, line, 6..11, &mut errors);
@@ -283,35 +255,16 @@ fn lex_atom_basics(
     let alternate_location = parse_char(linenumber, line, 16, &mut errors);
     let residue_name = parse(linenumber, line, 17..20, &mut errors);
     let chain_id = String::from(parse_char(linenumber, line, 21, &mut errors));
-    let residue_serial_number = parse(linenumber, line, 22..26, &mut errors);
+    let residue_serial_number: isize = parse(linenumber, line, 22..26, &mut errors);
     let insertion = parse_char(linenumber, line, 26, &mut errors);
     let segment_id = parse(linenumber, line, 72..76, &mut errors);
     let element = parse(linenumber, line, 76..78, &mut errors);
 
-    let mut charge = 0;
-    #[allow(clippy::unwrap_used)]
-    if chars.len() >= 80 && !(chars[78] == ' ' && chars[79] == ' ') {
-        if !chars[78].is_ascii_digit() {
-            errors.push(PDBError::new(
-                ErrorLevel::InvalidatingError,
-                "Atom charge is not correct",
-                "The charge is not numeric, it is defined to be [0-9][+-], so two characters in total.",
-                Context::line(linenumber, line, 78, 1),
-            ));
-        } else if chars[79] != '-' && chars[79] != '+' {
-            errors.push(PDBError::new(
-                ErrorLevel::InvalidatingError,
-                "Atom charge is not correct",
-                "The charge is not properly signed, it is defined to be [0-9][+-], so two characters in total.",
-                Context::line(linenumber, line, 79, 1),
-            ));
-        } else {
-            charge = isize::try_from(chars[78].to_digit(10).unwrap()).unwrap();
-            if chars[79] == '-' {
-                charge *= -1;
-            }
-        }
+    let mut charge: f32 = parse(linenumber, line, 71..76, &mut errors);
+    if chars[70] == '-' {
+        charge *= -1.;
     }
+    let autodock_type: String = parse(linenumber, line, 76..79, &mut errors);
 
     (
         (
@@ -333,6 +286,7 @@ fn lex_atom_basics(
             segment_id,
             element,
             charge,
+            autodock_type,
         ),
         errors,
     )
